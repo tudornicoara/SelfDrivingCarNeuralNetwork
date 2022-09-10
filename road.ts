@@ -1,5 +1,15 @@
 class Road{
-    constructor(x, width, laneCount = 3) {
+    private x;
+    private width;
+    private laneCount;
+    private top;
+    private bottom;
+    private left;
+    private right;
+    
+    public borders;
+
+    constructor(x : number, width : number, laneCount = 3) {
         this.x = x;
         this.width = width;
         this.laneCount = laneCount;
@@ -22,13 +32,13 @@ class Road{
         ];
     }
 
-    getLaneCenter(laneIndex) {
+    getLaneCenter(laneIndex: number) {
         const laneWidth = this.width / this.laneCount;
         return this.left + laneWidth/2 +
             Math.min(laneIndex, this.laneCount-1)*laneWidth;
     }
 
-    draw(ctx) {
+    draw(ctx: any) {
         ctx.lineWidth = 5;
         ctx.strokeStyle = "white";
 

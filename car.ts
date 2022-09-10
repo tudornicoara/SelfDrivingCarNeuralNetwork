@@ -1,5 +1,20 @@
 class Car{
-    constructor(x, y, width, height) {
+    private width;
+    private height;
+    private speed;
+    private acceleration;
+    private maxSpeed;
+    private friction;
+    private damaged;
+    private sensor;
+    private controls;
+    private polygon: Point[] = [];
+
+    public x;
+    public y;
+    public angle;
+
+    constructor(x: number, y: number, width: number, height: number) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -17,14 +32,14 @@ class Car{
         this.controls = new Controls();
     }
 
-    update(roadBorders) {
+    update(roadBorders: any) {
         this.#move();
         this.polygon = this.#createPolygon();
         this.damaged = this.#assessDamage(roadBorders);
         this.sensor.update(roadBorders);
     }
 
-    #assessDamage(roadBorders) {
+    #assessDamage(roadBorders: any) {
         for (let i = 0; i < roadBorders.length; i++) {
             if (polysIntersect(this.polygon, roadBorders[i])) {
                 return true;
@@ -34,7 +49,7 @@ class Car{
     }
 
     #createPolygon() {
-        const points = [];
+        const points: Point[] = [];
         const rad = Math.hypot(this.width, this.height)/2;
         const alpha = Math.atan2(this.width, this.height);
         points.push({
@@ -102,7 +117,7 @@ class Car{
         this.y -= Math.cos(this.angle)*this.speed;
     }
 
-    draw(ctx) {
+    draw(ctx: any) {
         if (this.damaged) {
             ctx.fillStyle = "gray";
         } else {

@@ -1,5 +1,13 @@
 class Sensor {
-    constructor(car) {
+
+    private car: Car;
+    private rayCount;
+    private rayLength;
+    private raySpread;
+    private rays: Point[][];
+    private readings: any[];
+
+    constructor(car: Car) {
         this.car = car;
         this.rayCount = 5;
         this.rayLength = 150;
@@ -9,7 +17,7 @@ class Sensor {
         this.readings = [];
     }
 
-    update(roadBorders) {
+    update(roadBorders: any) {
         this.#castRays();
         this.readings = [];
         for (let i = 0; i < this.rays.length; i++) {
@@ -19,7 +27,7 @@ class Sensor {
         }
     }
 
-    #getReading(ray, roadBorders) {
+    #getReading(ray: Point[], roadBorders: any) {
         let touches = [];
 
         for (let i = 0; i < roadBorders.length; i++) {
@@ -62,7 +70,7 @@ class Sensor {
         }
     }
 
-    draw(ctx) {
+    draw(ctx: any) {
         for (let i = 0; i < this.rayCount; i++) {
             let end = this.rays[i][1];
             if (this.readings[i]) {

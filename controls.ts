@@ -1,4 +1,10 @@
 class Controls{
+
+    public forward;
+    public reverse;
+    public left;
+    public right;
+
     constructor() {
         this.forward = false;
         this.left = false;

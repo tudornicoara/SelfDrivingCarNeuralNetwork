@@ -1,0 +1,25 @@
+{
+  "name": "self-driving-car",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.ts",
+  "scripts": {
+    "build": "tsc && npm run build:cp-files",
+    "build:cp-files": "cp index.html ./dist && cp stle.css ./dist",
+    "type": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tudornicoara/SelfDrivingCarNeuralNetwork.git"
+  },
+  "author": "Tudor Nicoara",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tudornicoara/SelfDrivingCarNeuralNetwork/issues"
+  },
+  "homepage": "https://github.com/tudornicoara/SelfDrivingCarNeuralNetwork#readme",
+  "devDependencies": {
+    "tsc": "^2.0.4",
+    "typescript": "^4.8.3"
+  }
+}
