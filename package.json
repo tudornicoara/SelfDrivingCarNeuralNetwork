@@ -4,8 +4,9 @@
   "description": "",
   "main": "main.ts",
   "scripts": {
-    "build": "tsc && npm run build:cp-files",
-    "build:cp-files": "cp index.html ./dist && cp stle.css ./dist",
+    "watch": "tsc -w",
+    "build": "tsc && npm run cp-files",
+    "cp-files": "copy index.html ./dist && copy style.css ./dist",
     "type": "tsc --noEmit"
   },
   "repository": {
