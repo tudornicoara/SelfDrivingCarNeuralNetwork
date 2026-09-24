@@ -5,8 +5,9 @@
 <body>
     <canvas id="carCanvas"></canvas>
     <div id="verticalButtons">
-        <button id="saveButton">&#9989; Save</button>
-        <button id="discardButton">&#10062; Discard</button>
+        <button id="skipButton" title="End this generation now and keep its best brain">&#9193; Next gen</button>
+        <button id="discardButton" title="Forget the saved brain and start training from scratch">&#10062; Discard</button>
+        <div id="stats"></div>
     </div>
     <canvas id="networkCanvas"></canvas>
     <script type="module" src="/src/main.ts"></script>

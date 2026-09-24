@@ -12,6 +12,13 @@ body {
     flex-direction: column;
 }
 
+#stats {
+    margin: 4px 2px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre;
+}
+
 button {
     border: none;
     border-radius: 5px;

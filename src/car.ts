@@ -22,9 +22,17 @@ export class Car {
     brain?: NeuralNetwork;
     controls: Controls;
 
+    // Training bookkeeping, used to score AI cars
+    startY: number;
+    passed = 0;
+    framesAlive = 0;
+    framesSincePass = 0;
+    fitness = 0;
+
     constructor(x: number, y: number, width: number, height: number, controlType: ControlType, maxSpeed = 3) {
         this.x = x;
         this.y = y;
+        this.startY = y;
         this.width = width;
         this.height = height;
         this.maxSpeed = maxSpeed;
@@ -46,7 +54,7 @@ export class Car {
             this.polygon = this.#createPolygon();
             this.damaged = this.#assessDamage(roadBorders, traffic);
         }
-        if (this.sensor && this.brain) {
+        if (this.sensor && this.brain && !this.damaged) {
             this.sensor.update(roadBorders, traffic);
             const offsets = this.sensor.readings
                 .map(s => s==null ? 0 : 1-s.offset);

@@ -4,7 +4,7 @@ import { getIntersection, lerp, type Intersection, type Segment } from "./utils"
 export class Sensor {
     car: Car;
     rayCount = 5;
-    rayLength = 150;
+    rayLength = 250;
     raySpread = Math.PI/2;
 
     rays: Segment[] = [];
