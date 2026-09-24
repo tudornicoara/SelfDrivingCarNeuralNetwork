@@ -1,15 +1,20 @@
-class Sensor {
-    constructor(car) {
-        this.car = car;
-        this.rayCount = 5;
-        this.rayLength = 150;
-        this.raySpread = Math.PI/2;
+import type { Car } from "./car";
+import { getIntersection, lerp, type Intersection, type Segment } from "./utils";
 
-        this.rays = [];
-        this.readings = [];
+export class Sensor {
+    car: Car;
+    rayCount = 5;
+    rayLength = 150;
+    raySpread = Math.PI/2;
+
+    rays: Segment[] = [];
+    readings: (Intersection | null)[] = [];
+
+    constructor(car: Car) {
+        this.car = car;
     }
 
-    update(roadBorders, traffic) {
+    update(roadBorders: Segment[], traffic: Car[]): void {
         this.#castRays();
         this.readings = [];
         for (let i = 0; i < this.rays.length; i++) {
@@ -22,8 +27,8 @@ class Sensor {
         }
     }
 
-    #getReading(ray, roadBorders, traffic) {
-        let touches = [];
+    #getReading(ray: Segment, roadBorders: Segment[], traffic: Car[]): Intersection | null {
+        const touches: Intersection[] = [];
 
         for (let i = 0; i < roadBorders.length; i++) {
             const touch = getIntersection(
@@ -32,7 +37,7 @@ class Sensor {
                 roadBorders[i][0],
                 roadBorders[i][1]
             );
-            
+
             if (touch) {
                 touches.push(touch);
             }
@@ -58,15 +63,15 @@ class Sensor {
         } else {
             const offsets = touches.map(e => e.offset);
             const minOffset = Math.min(...offsets);
-            return touches.find(e => e.offset === minOffset);
+            return touches.find(e => e.offset === minOffset) ?? null;
         }
     }
 
-    #castRays() {
+    #castRays(): void {
         this.rays = [];
         for (let i = 0; i < this.rayCount; i++) {
             const rayAngle = lerp(
-                this.raySpread/2, 
+                this.raySpread/2,
                 -this.raySpread/2,
                 this.rayCount === 1 ? 0.5 : i/(this.rayCount - 1))
                 + this.car.angle;
@@ -80,11 +85,12 @@ class Sensor {
         }
     }
 
-    draw(ctx) {
+    draw(ctx: CanvasRenderingContext2D): void {
         for (let i = 0; i < this.rayCount; i++) {
             let end = this.rays[i][1];
-            if (this.readings[i]) {
-                end = this.readings[i];
+            const reading = this.readings[i];
+            if (reading) {
+                end = reading;
             }
 
             ctx.beginPath();
@@ -93,12 +99,12 @@ class Sensor {
             ctx.moveTo(
                 this.rays[i][0].x,
                 this.rays[i][0].y
-            );   
+            );
             ctx.lineTo(
                 end.x,
                 end.y
             );
-            ctx.stroke();   
+            ctx.stroke();
 
             ctx.beginPath();
             ctx.lineWidth = 2;
@@ -106,12 +112,12 @@ class Sensor {
             ctx.moveTo(
                 this.rays[i][1].x,
                 this.rays[i][1].y
-            );   
+            );
             ctx.lineTo(
                 end.x,
                 end.y
             );
-            ctx.stroke();  
+            ctx.stroke();
         }
     }
 }

@@ -1,5 +1,9 @@
-class NeuralNetwork {
-    constructor(neuronCounts) {
+import { lerp } from "./utils";
+
+export class NeuralNetwork {
+    levels: Level[];
+
+    constructor(neuronCounts: number[]) {
         this.levels = [];
         for (let i = 0; i < neuronCounts.length-1; i++) {
             this.levels.push(new Level(
@@ -8,7 +12,7 @@ class NeuralNetwork {
         }
     }
 
-    static feedForward(givenInputs, network) {
+    static feedForward(givenInputs: number[], network: NeuralNetwork): number[] {
         let outputs = Level.feedForward(
             givenInputs, network.levels[0]
         );
@@ -22,7 +26,7 @@ class NeuralNetwork {
         return outputs;
     }
 
-    static mutate(network, amount=1) {
+    static mutate(network: NeuralNetwork, amount = 1): void {
         network.levels.forEach(level => {
             for (let i = 0; i < level.biases.length; i++) {
                 level.biases[i] = lerp(level.biases[i], Math.random()*2-1, amount);
@@ -37,13 +41,18 @@ class NeuralNetwork {
     }
 }
 
-class Level {
-    constructor(inputCount, outputCount) {
+export class Level {
+    inputs: number[];
+    outputs: number[];
+    biases: number[]; // Value above which the neural network will fire
+    weights: number[][]; // How strong the connections are between each node
+
+    constructor(inputCount: number, outputCount: number) {
         this.inputs = new Array(inputCount);
         this.outputs = new Array(outputCount);
-        this.biases = new Array(outputCount); // Value above which the neural network will fire
+        this.biases = new Array(outputCount);
 
-        this.weights = []; // How strong the connections are between each node
+        this.weights = [];
         for (let i = 0; i < inputCount; i++) {
             this.weights[i] = new Array(outputCount);
         }
@@ -51,7 +60,7 @@ class Level {
         Level.#randomize(this);
     }
 
-    static #randomize(level) {
+    static #randomize(level: Level): void {
         for (let i = 0; i < level.inputs.length; i++) {
             for (let j = 0; j < level.outputs.length; j++) {
                 level.weights[i][j] = Math.random()*2-1;
@@ -63,7 +72,7 @@ class Level {
         }
     }
 
-    static feedForward(givenInputs, level) {
+    static feedForward(givenInputs: number[], level: Level): number[] {
         for (let i = 0; i < level.inputs.length; i++) {
             level.inputs[i] = givenInputs[i];
         }

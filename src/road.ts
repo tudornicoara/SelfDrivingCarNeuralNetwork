@@ -1,5 +1,16 @@
-class Road{
-    constructor(x, width, laneCount = 3) {
+import { lerp, type Point, type Segment } from "./utils";
+
+export class Road {
+    x: number;
+    width: number;
+    laneCount: number;
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+    borders: Segment[];
+
+    constructor(x: number, width: number, laneCount = 3) {
         this.x = x;
         this.width = width;
         this.laneCount = laneCount;
@@ -11,10 +22,10 @@ class Road{
         this.top = -infinity;
         this.bottom = infinity;
 
-        const topLeft = {x:this.left, y:this.top};
-        const topRight = {x:this.right, y:this.top};
-        const bottomLeft = {x:this.left, y:this.bottom};
-        const bottomRight = {x:this.right, y:this.bottom};
+        const topLeft: Point = {x:this.left, y:this.top};
+        const topRight: Point = {x:this.right, y:this.top};
+        const bottomLeft: Point = {x:this.left, y:this.bottom};
+        const bottomRight: Point = {x:this.right, y:this.bottom};
 
         this.borders = [
             [topLeft, bottomLeft],
@@ -22,13 +33,13 @@ class Road{
         ];
     }
 
-    getLaneCenter(laneIndex) {
+    getLaneCenter(laneIndex: number): number {
         const laneWidth = this.width / this.laneCount;
         return this.left + laneWidth/2 +
             Math.min(laneIndex, this.laneCount-1)*laneWidth;
     }
 
-    draw(ctx) {
+    draw(ctx: CanvasRenderingContext2D): void {
         ctx.lineWidth = 5;
         ctx.strokeStyle = "white";
 
