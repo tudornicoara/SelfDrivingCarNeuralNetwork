@@ -25,7 +25,7 @@ function getElement(id: string): HTMLElement {
 }
 
 function fitCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): { width: number; height: number } {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     const pixelWidth = Math.round(width * dpr);
@@ -39,6 +39,7 @@ function fitCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): { 
     return { width, height };
 }
 
+const MAX_DPR = 2;
 const VIEW_WIDTH = 260;
 const ROAD_WIDTH = 180;
 const CAMERA_ANCHOR = 0.7;
@@ -64,7 +65,8 @@ const hud = {
 const road = new Road(VIEW_WIDTH/2, ROAD_WIDTH);
 const effects = new Effects();
 
-const N = 100;
+const IS_MOBILE = window.matchMedia("(pointer: coarse)").matches;
+const N = IS_MOBILE ? 40 : 100;
 // Mutation amount is spread across the population: some cars stay close
 // to the parent brain, others explore further away from it.
 const MIN_MUTATION = 0.05;
@@ -269,6 +271,9 @@ function drawScene(aliveCount: number, time: number): void {
     }
 
     const network = fitCanvas(networkCanvas, networkCtx);
+    if (network.width === 0 || network.height === 0) {
+        return;
+    }
     Visualizer.drawNetwork(networkCtx, bestCar.brain!, network.width, network.height, time);
 }
 

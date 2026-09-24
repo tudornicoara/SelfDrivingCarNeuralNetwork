@@ -14,6 +14,7 @@
 body {
     margin: 0;
     height: 100vh;
+    height: 100dvh;
     padding: 14px;
     overflow: hidden;
     display: flex;
@@ -129,6 +130,7 @@ button {
     border: 1px solid rgba(0, 229, 255, 0.35);
     background: rgba(255, 255, 255, 0.04);
     cursor: pointer;
+    touch-action: manipulation;
     transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
 
@@ -147,4 +149,53 @@ button:hover {
     border-color: var(--magenta);
     background: rgba(255, 61, 216, 0.12);
     box-shadow: 0 0 14px rgba(255, 61, 216, 0.35);
+}
+
+/* Phones */
+@media (max-width: 700px) {
+    body {
+        flex-direction: column;
+        justify-content: flex-start;
+        padding: 8px;
+        gap: 8px;
+    }
+
+    #carCanvas {
+        flex: 1 1 0;
+        height: auto;
+        min-height: 0;
+    }
+
+    #networkCanvas,
+    .hud-label,
+    .bar,
+    .hud-divider {
+        display: none;
+    }
+
+    #hud {
+        order: -1;
+        width: 100%;
+        max-width: 420px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 6px 14px;
+        padding: 8px 12px;
+    }
+
+    .hud-gen {
+        margin: 0;
+        font-size: 20px;
+    }
+
+    .stat {
+        gap: 5px;
+        font-size: 11px;
+    }
+
+    button {
+        padding: 6px 10px;
+    }
 }
