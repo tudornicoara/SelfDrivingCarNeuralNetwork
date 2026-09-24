@@ -1,11 +1,13 @@
 import type { Car } from "./car";
-import { getIntersection, lerp, type Intersection, type Segment } from "./utils";
+import { getIntersection, lerp, sensorColor, type Intersection, type Segment } from "./utils";
+
+export const SENSOR_SPREAD = Math.PI/2;
 
 export class Sensor {
     car: Car;
     rayCount = 5;
     rayLength = 250;
-    raySpread = Math.PI/2;
+    raySpread = SENSOR_SPREAD;
 
     rays: Segment[] = [];
     readings: (Intersection | null)[] = [];
@@ -86,38 +88,55 @@ export class Sensor {
     }
 
     draw(ctx: CanvasRenderingContext2D): void {
-        for (let i = 0; i < this.rayCount; i++) {
-            let end = this.rays[i][1];
+        ctx.save();
+        ctx.lineCap = "round";
+        for (let i = 0; i < this.rays.length; i++) {
+            const [start, tip] = this.rays[i];
             const reading = this.readings[i];
+            const end = reading ?? tip;
+            const proximity = reading ? 1 - reading.offset : 0;
+
             if (reading) {
-                end = reading;
+                ctx.globalCompositeOperation = "source-over";
+                ctx.setLineDash([2, 5]);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(end.x, end.y);
+                ctx.lineTo(tip.x, tip.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
             }
 
-            ctx.beginPath();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "yellow";
-            ctx.moveTo(
-                this.rays[i][0].x,
-                this.rays[i][0].y
-            );
-            ctx.lineTo(
-                end.x,
-                end.y
-            );
-            ctx.stroke();
+            ctx.globalCompositeOperation = "lighter";
+            const beam = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+            beam.addColorStop(0, sensorColor(proximity, 0));
+            beam.addColorStop(1, sensorColor(proximity, 0.9));
+            for (const [width, alpha] of [[6, 0.25], [1.5, 1]]) {
+                ctx.globalAlpha = alpha;
+                ctx.strokeStyle = beam;
+                ctx.lineWidth = width;
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
 
-            ctx.beginPath();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "black";
-            ctx.moveTo(
-                this.rays[i][1].x,
-                this.rays[i][1].y
-            );
-            ctx.lineTo(
-                end.x,
-                end.y
-            );
-            ctx.stroke();
+            if (reading) {
+                const glow = ctx.createRadialGradient(end.x, end.y, 0, end.x, end.y, 10);
+                glow.addColorStop(0, sensorColor(proximity, 0.8));
+                glow.addColorStop(1, sensorColor(proximity, 0));
+                ctx.fillStyle = glow;
+                ctx.beginPath();
+                ctx.arc(end.x, end.y, 10, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = "white";
+                ctx.beginPath();
+                ctx.arc(end.x, end.y, 2, 0, Math.PI*2);
+                ctx.fill();
+            }
         }
+        ctx.restore();
     }
 }

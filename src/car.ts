@@ -1,7 +1,15 @@
 import { Controls, type ControlType } from "./controls";
 import { NeuralNetwork } from "./network";
 import { Sensor } from "./sensor";
+import { AI_PAINT, BEAM_LENGTH, BEAM_WIDTH, SPRITE_PAD, getBeamSprite, getCarSprite, hsl, randomTrafficPaint, type Paint } from "./sprites";
 import { polysIntersect, type Point, type Polygon, type Segment } from "./utils";
+
+const TRAIL_LENGTH = 24;
+
+export interface CarDrawOptions {
+    hero?: boolean;
+    drawSensor?: boolean;
+}
 
 export class Car {
     x: number;
@@ -21,6 +29,9 @@ export class Car {
     sensor?: Sensor;
     brain?: NeuralNetwork;
     controls: Controls;
+    paint: Paint;
+    // Recent positions, drawn as a light trail behind the leading car
+    trail: Point[] = [];
 
     // Training bookkeeping, used to score AI cars
     startY: number;
@@ -46,6 +57,7 @@ export class Car {
             );
         }
         this.controls = new Controls(controlType);
+        this.paint = controlType === "DUMMY" ? randomTrafficPaint() : AI_PAINT;
     }
 
     update(roadBorders: Segment[], traffic: Car[]): void {
@@ -53,6 +65,12 @@ export class Car {
             this.#move();
             this.polygon = this.#createPolygon();
             this.damaged = this.#assessDamage(roadBorders, traffic);
+            if (this.useBrain) {
+                this.trail.push({x: this.x, y: this.y});
+                if (this.trail.length > TRAIL_LENGTH) {
+                    this.trail.shift();
+                }
+            }
         }
         if (this.sensor && this.brain && !this.damaged) {
             this.sensor.update(roadBorders, traffic);
@@ -153,22 +171,46 @@ export class Car {
         this.y -= Math.cos(this.angle)*this.speed;
     }
 
-    draw(ctx: CanvasRenderingContext2D, color: string, drawSensor = false): void {
-        if (this.damaged) {
-            ctx.fillStyle = "gray";
-        } else {
-            ctx.fillStyle = color;
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(this.polygon[0].x, this.polygon[0].y);
-        for (let i = 1; i < this.polygon.length; i++) {
-            ctx.lineTo(this.polygon[i].x, this.polygon[i].y);
-        }
-        ctx.fill();
-
-        if (this.sensor && drawSensor) {
+    draw(ctx: CanvasRenderingContext2D, { hero = false, drawSensor = false }: CarDrawOptions = {}): void {
+        if (this.sensor && drawSensor && !this.damaged) {
             this.sensor.draw(ctx);
         }
+
+        const variant = this.damaged ? "wreck" : hero ? "hero" : "normal";
+        const sprite = getCarSprite(this.width, this.height, this.paint, variant);
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(-this.angle);
+        ctx.drawImage(sprite,
+            -this.width/2 - SPRITE_PAD, -this.height/2 - SPRITE_PAD,
+            this.width + SPRITE_PAD*2, this.height + SPRITE_PAD*2);
+        ctx.restore();
+    }
+
+    // Best drawn with the "lighter" composite operation, before the cars themselves
+    drawBeams(ctx: CanvasRenderingContext2D): void {
+        if (this.damaged) {
+            return;
+        }
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(-this.angle);
+        ctx.drawImage(getBeamSprite(), -BEAM_WIDTH/2, -this.height/2 - BEAM_LENGTH + 2, BEAM_WIDTH, BEAM_LENGTH);
+        ctx.restore();
+    }
+
+    drawTrail(ctx: CanvasRenderingContext2D): void {
+        ctx.save();
+        ctx.lineCap = "round";
+        for (let i = 1; i < this.trail.length; i++) {
+            const t = i / this.trail.length;
+            ctx.strokeStyle = hsl(this.paint, 10, t * 0.35);
+            ctx.lineWidth = this.width * 0.55 * t;
+            ctx.beginPath();
+            ctx.moveTo(this.trail[i - 1].x, this.trail[i - 1].y);
+            ctx.lineTo(this.trail[i].x, this.trail[i].y);
+            ctx.stroke();
+        }
+        ctx.restore();
     }
 }

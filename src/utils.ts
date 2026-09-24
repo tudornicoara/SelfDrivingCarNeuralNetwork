@@ -52,12 +52,8 @@ export function polysIntersect(poly1: Polygon, poly2: Polygon): boolean {
     return false;
 }
 
-export function getRGBA(value: number): string {
-    const alpha=Math.abs(value);
-    const R=value<0?0:255;
-    const G=R;
-    const B=value>0?0:255;
-    return "rgba("+R+","+G+","+B+","+alpha+")";
+export function sensorColor(proximity: number, alpha = 1): string {
+    return `hsla(${lerp(150, 0, proximity)}, 100%, 60%, ${alpha})`;
 }
 
 export function sleep(milliseconds: number): void {
