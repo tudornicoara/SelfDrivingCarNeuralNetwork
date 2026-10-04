@@ -10,8 +10,32 @@ export interface Intersection extends Point {
 export type Segment = [Point, Point];
 export type Polygon = Point[];
 
+export type Random = () => number;
+
 export function lerp(A: number, B: number, t: number): number {
     return A + (B - A) * t;
+}
+
+export function clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
+}
+
+export function seededRandom(seed: number): Random {
+    let state = seed >>> 0;
+    return () => {
+        state = (state + 0x6D2B79F5) >>> 0;
+        let t = state;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+// Standard normal sample (Box-Muller)
+export function gaussian(): number {
+    const u = 1 - Math.random();
+    const v = Math.random();
+    return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
 }
 
 export function getIntersection(A: Point, B: Point, C: Point, D: Point): Intersection | null {

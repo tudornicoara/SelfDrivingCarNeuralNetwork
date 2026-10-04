@@ -1,11 +1,11 @@
 import "./style.css";
-import { Car } from "./car";
+import { BRAIN_SHAPE, Car } from "./car";
 import { Effects } from "./effects";
 import { NeuralNetwork } from "./network";
 import { Road, type Viewport } from "./road";
 import { AI_PAINT } from "./sprites";
 import { TrafficGenerator, TRAFFIC_SPEED } from "./traffic";
-import { lerp } from "./utils";
+import { lerp, seededRandom } from "./utils";
 import { Visualizer } from "./visualizer";
 
 function getCanvas(id: string): HTMLCanvasElement {
@@ -54,6 +54,7 @@ const networkCtx = networkCanvas.getContext("2d")!;
 
 const hud = {
     generation: getElement("statGen"),
+    round: getElement("statRound"),
     alive: getElement("statAlive"),
     aliveBar: getElement("aliveBar"),
     passed: getElement("statPassed"),
@@ -67,28 +68,40 @@ const effects = new Effects();
 
 const IS_MOBILE = window.matchMedia("(pointer: coarse)").matches;
 const N = IS_MOBILE ? 40 : 100;
-// Mutation amount is spread across the population: some cars stay close
-// to the parent brain, others explore further away from it.
+const ROUNDS = 3;
+const ELITE_COUNT = IS_MOBILE ? 3 : 5;
+const CROSSOVER_CHANCE = 0.5;
+const MUTATION_RATE = 0.15;
 const MIN_MUTATION = 0.05;
-const MAX_MUTATION = 0.3;
+const MAX_MUTATION = 0.5;
 
 // Fitness = cars passed * PASS_REWARD + ground gained on the traffic flow.
 // Sitting behind a car gains nothing, so only overtaking pays off.
 const PASS_REWARD = 300;
 // A car that overtakes nobody for this long is considered stuck and removed.
 const STALL_FRAMES = 60 * 12;
-// A car this far behind the leader is removed.
+// A car this far behind the traffic flow is removed.
 const LAG_DISTANCE = 400;
-// Hard cap on a generation's length, in case the best car never crashes.
-const MAX_GENERATION_FRAMES = 60 * 180;
+// Hard cap on a round's length, in case the best car never crashes.
+const MAX_ROUND_FRAMES = 60 * 120;
 
-const STORAGE_BRAIN = "bestBrain";
-const STORAGE_GENERATION = "generation";
-const STORAGE_BEST_FITNESS = "bestFitness";
+// Bump the version whenever BRAIN_SHAPE changes, so old brains are dropped
+const STORAGE_PREFIX = "v2:";
+const STORAGE_ELITES = STORAGE_PREFIX + "elites";
+const STORAGE_GENERATION = STORAGE_PREFIX + "generation";
+const STORAGE_BEST_FITNESS = STORAGE_PREFIX + "bestFitness";
+for (const legacyKey of ["bestBrain", "generation", "bestFitness"]) {
+    localStorage.removeItem(legacyKey);
+}
 
 let generation = Number(localStorage.getItem(STORAGE_GENERATION) ?? 1);
 let allTimeBestFitness = Number(localStorage.getItem(STORAGE_BEST_FITNESS) ?? 0);
 let lastGenerationFitness = 0;
+
+let population: NeuralNetwork[] = breed(loadElites());
+let totals: number[] = [];
+let seeds: number[] = [];
+let round = 0;
 
 let cars: Car[] = [];
 let traffic: TrafficGenerator;
@@ -96,59 +109,112 @@ let bestCar: Car;
 let frame = 0;
 let cameraY = 0;
 
-document.getElementById("skipButton")!.addEventListener("click", endGeneration);
+document.getElementById("skipButton")!.addEventListener("click", skipGeneration);
 document.getElementById("discardButton")!.addEventListener("click", discard);
 
 startGeneration();
 animate();
 
 function startGeneration(): void {
-    cars = generateCars(N);
+    totals = population.map(() => 0);
+    seeds = Array.from({ length: ROUNDS }, () => Math.floor(Math.random() * 2**32));
+    round = 0;
+    startRound();
+}
+
+function startRound(): void {
+    cars = population.map(brain => {
+        const car = new Car(road.getLaneCenter(1), 100, 30, 50, "AI");
+        car.brain = brain;
+        return car;
+    });
     bestCar = cars[0];
-    traffic = new TrafficGenerator(road);
+    traffic = new TrafficGenerator(road, seededRandom(seeds[round]));
     frame = 0;
     cameraY = bestCar.y;
     effects.clear();
 }
 
+function finishRound(): void {
+    cars.forEach((car, i) => totals[i] += car.fitness);
+    round++;
+}
+
+function nextRound(): void {
+    finishRound();
+    if (round < ROUNDS) {
+        startRound();
+    } else {
+        endGeneration();
+    }
+}
+
+function skipGeneration(): void {
+    // Score on the rounds played so far, including the current one
+    finishRound();
+    endGeneration();
+}
+
 function endGeneration(): void {
-    const best = fittestCar();
-    lastGenerationFitness = best.fitness;
-    allTimeBestFitness = Math.max(allTimeBestFitness, best.fitness);
+    const ranked = population
+        .map((brain, i) => ({ brain, fitness: totals[i] / round }))
+        .sort((a, b) => b.fitness - a.fitness);
+    const elites = ranked.slice(0, ELITE_COUNT).map(r => r.brain);
+
+    lastGenerationFitness = ranked[0].fitness;
+    allTimeBestFitness = Math.max(allTimeBestFitness, lastGenerationFitness);
     generation++;
 
-    localStorage.setItem(STORAGE_BRAIN, JSON.stringify(best.brain));
+    localStorage.setItem(STORAGE_ELITES, JSON.stringify(elites));
     localStorage.setItem(STORAGE_GENERATION, String(generation));
     localStorage.setItem(STORAGE_BEST_FITNESS, String(allTimeBestFitness));
 
+    population = breed(elites);
     startGeneration();
 }
 
 function discard(): void {
-    localStorage.removeItem(STORAGE_BRAIN);
+    localStorage.removeItem(STORAGE_ELITES);
     localStorage.removeItem(STORAGE_GENERATION);
     localStorage.removeItem(STORAGE_BEST_FITNESS);
     generation = 1;
     allTimeBestFitness = 0;
     lastGenerationFitness = 0;
+    population = breed([]);
     startGeneration();
 }
 
-function generateCars(N: number): Car[] {
-    const savedBrain = localStorage.getItem(STORAGE_BRAIN);
-    const cars: Car[] = [];
-    for (let i = 0; i < N; i++) {
-        const car = new Car(road.getLaneCenter(1), 100, 30, 50, "AI");
-        if (savedBrain) {
-            car.brain = JSON.parse(savedBrain) as NeuralNetwork;
-            // Car 0 keeps the parent brain untouched, so a generation is never worse than the last
-            if (i !== 0) {
-                NeuralNetwork.mutate(car.brain, lerp(MIN_MUTATION, MAX_MUTATION, i/(N - 1)));
-            }
-        }
-        cars.push(car);
+function loadElites(): NeuralNetwork[] {
+    try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_ELITES) ?? "[]") as NeuralNetwork[];
+        return saved.filter(brain => NeuralNetwork.hasShape(brain, BRAIN_SHAPE));
+    } catch {
+        return [];
     }
-    return cars;
+}
+
+// Builds a population of N brains: the elites unchanged, then mutated children of them
+function breed(elites: NeuralNetwork[]): NeuralNetwork[] {
+    if (elites.length === 0) {
+        return Array.from({ length: N }, () => new NeuralNetwork(BRAIN_SHAPE));
+    }
+
+    const brains = elites.map(NeuralNetwork.clone);
+    const childCount = N - brains.length;
+    for (let i = 0; i < childCount; i++) {
+        const parent = pickParent(elites);
+        const child = elites.length > 1 && Math.random() < CROSSOVER_CHANCE
+            ? NeuralNetwork.crossover(parent, pickParent(elites))
+            : NeuralNetwork.clone(parent);
+        const strength = lerp(MIN_MUTATION, MAX_MUTATION, childCount > 1 ? i/(childCount - 1) : 0);
+        NeuralNetwork.mutate(child, MUTATION_RATE, strength);
+        brains.push(child);
+    }
+    return brains;
+}
+
+function pickParent(elites: NeuralNetwork[]): NeuralNetwork {
+    return elites[Math.floor(Math.random()**2 * elites.length)];
 }
 
 function fittestCar(): Car {
@@ -196,14 +262,15 @@ function animate(time = 0): void {
         }
 
         updateFitness(car);
-        if (car.framesSincePass > STALL_FRAMES || car.y > leader.y + LAG_DISTANCE) {
+        const flowY = car.startY - TRAFFIC_SPEED * car.framesAlive;
+        if (car.framesSincePass > STALL_FRAMES || car.y > flowY + LAG_DISTANCE) {
             car.damaged = true;
         }
     }
 
     frame++;
-    if (cars.every(c => c.damaged) || frame >= MAX_GENERATION_FRAMES) {
-        endGeneration();
+    if (cars.every(c => c.damaged) || frame >= MAX_ROUND_FRAMES) {
+        nextRound();
         requestAnimationFrame(animate);
         return;
     }
@@ -261,6 +328,7 @@ function drawScene(aliveCount: number, time: number): void {
 
     if (frame % 10 === 0) {
         hud.generation.textContent = String(generation);
+        hud.round.textContent = `${Math.min(round + 1, ROUNDS)}/${ROUNDS}`;
         hud.alive.textContent = `${aliveCount}/${N}`;
         hud.aliveBar.style.width = `${aliveCount / N * 100}%`;
         const fittest = fittestCar();

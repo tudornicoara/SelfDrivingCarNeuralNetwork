@@ -1,10 +1,13 @@
 import { Controls, type ControlType } from "./controls";
 import { NeuralNetwork } from "./network";
-import { Sensor } from "./sensor";
+import { RAY_COUNT, Sensor } from "./sensor";
 import { AI_PAINT, BEAM_LENGTH, BEAM_WIDTH, SPRITE_PAD, getBeamSprite, getCarSprite, hsl, randomTrafficPaint, type Paint } from "./sprites";
 import { polysIntersect, type Point, type Polygon, type Segment } from "./utils";
 
 const TRAIL_LENGTH = 24;
+
+export const STATE_INPUT_LABELS = ["SPD", "ANG"];
+export const BRAIN_SHAPE = [RAY_COUNT + STATE_INPUT_LABELS.length, 6, 4];
 
 export interface CarDrawOptions {
     hero?: boolean;
@@ -52,9 +55,7 @@ export class Car {
 
         if (controlType !== "DUMMY") {
             this.sensor = new Sensor(this);
-            this.brain = new NeuralNetwork(
-                [this.sensor.rayCount,6,4]
-            );
+            this.brain = new NeuralNetwork(BRAIN_SHAPE);
         }
         this.controls = new Controls(controlType);
         this.paint = controlType === "DUMMY" ? randomTrafficPaint() : AI_PAINT;
@@ -76,7 +77,8 @@ export class Car {
             this.sensor.update(roadBorders, traffic);
             const offsets = this.sensor.readings
                 .map(s => s==null ? 0 : 1-s.offset);
-            const outputs = NeuralNetwork.feedForward(offsets, this.brain);
+            const inputs = [...offsets, this.speed/this.maxSpeed, Math.sin(this.angle)];
+            const outputs = NeuralNetwork.feedForward(inputs, this.brain);
 
             if (this.useBrain) {
                 this.controls.forward = !!outputs[0];
@@ -187,7 +189,6 @@ export class Car {
         ctx.restore();
     }
 
-    // Best drawn with the "lighter" composite operation, before the cars themselves
     drawBeams(ctx: CanvasRenderingContext2D): void {
         if (this.damaged) {
             return;

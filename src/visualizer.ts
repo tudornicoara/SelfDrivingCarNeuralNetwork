@@ -1,5 +1,6 @@
+import { STATE_INPUT_LABELS } from "./car";
 import type { Level, NeuralNetwork } from "./network";
-import { SENSOR_SPREAD } from "./sensor";
+import { RAY_COUNT, SENSOR_SPREAD } from "./sensor";
 import { lerp, sensorColor, type Point } from "./utils";
 
 type RGB = [number, number, number];
@@ -71,18 +72,25 @@ export class Visualizer {
             const biases = isInput ? null : levels[row - 1].biases;
             const y = rowY(row);
 
-            Visualizer.#drawRowLabel(ctx, isInput ? "SENSORS" : isOutput ? "CONTROLS" : "HIDDEN", y);
+            Visualizer.#drawRowLabel(ctx, isInput ? "INPUTS" : isOutput ? "CONTROLS" : "HIDDEN", y);
 
             for (let i = 0; i < values.length; i++) {
                 const x = nodeX(values.length, i, left, right);
                 const value = values[i] ?? 0;
-                const color = isInput
+                const isRay = isInput && i < RAY_COUNT;
+                const isState = isInput && !isRay;
+                const color = isRay
                     ? (alpha: number) => sensorColor(value, alpha)
-                    : (alpha: number) => rgba(POSITIVE, alpha);
-                Visualizer.#drawNode(ctx, x, y, value, biases?.[i], color, time);
+                    : isState
+                        ? (alpha: number) => weightColor(value, alpha)
+                        : (alpha: number) => rgba(POSITIVE, alpha);
+                Visualizer.#drawNode(ctx, x, y, isState ? Math.abs(value) : value, biases?.[i], color, time);
 
-                if (isInput) {
-                    Visualizer.#drawInputGlyph(ctx, x, y, i, values.length, value);
+                if (isRay) {
+                    Visualizer.#drawInputGlyph(ctx, x, y, i, RAY_COUNT, value);
+                }
+                if (isState) {
+                    Visualizer.#drawStateGlyph(ctx, x, y, STATE_INPUT_LABELS[i - RAY_COUNT], value);
                 }
                 if (isOutput) {
                     Visualizer.#drawOutputGlyph(ctx, x, y, i, value);
@@ -245,6 +253,30 @@ export class Visualizer {
             ctx.beginPath();
             ctx.roundRect(x - barWidth/2, barY, barWidth*value, 3, 1.5);
             ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    static #drawStateGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, value: number): void {
+        const originY = y + NODE_RADIUS + 36;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(160, 175, 220, 0.75)";
+        ctx.font = `600 10px ${MONO_FONT}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, x, originY - 8);
+
+        const barWidth = 30;
+        const barY = originY + 10;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.beginPath();
+        ctx.roundRect(x - barWidth/2, barY, barWidth, 3, 1.5);
+        ctx.fill();
+        const fill = Math.max(-1, Math.min(1, value)) * barWidth/2;
+        if (fill !== 0) {
+            ctx.fillStyle = weightColor(value, 1);
+            ctx.fillRect(Math.min(x, x + fill), barY, Math.abs(fill), 3);
         }
         ctx.restore();
     }

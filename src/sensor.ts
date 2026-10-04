@@ -2,10 +2,11 @@ import type { Car } from "./car";
 import { getIntersection, lerp, sensorColor, type Intersection, type Segment } from "./utils";
 
 export const SENSOR_SPREAD = Math.PI/2;
+export const RAY_COUNT = 5;
 
 export class Sensor {
     car: Car;
-    rayCount = 5;
+    rayCount = RAY_COUNT;
     rayLength = 250;
     raySpread = SENSOR_SPREAD;
 

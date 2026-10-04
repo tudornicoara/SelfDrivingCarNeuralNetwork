@@ -1,4 +1,4 @@
-import { lerp } from "./utils";
+import { clamp, gaussian } from "./utils";
 
 export class NeuralNetwork {
     levels: Level[];
@@ -26,18 +26,48 @@ export class NeuralNetwork {
         return outputs;
     }
 
-    static mutate(network: NeuralNetwork, amount = 1): void {
+    static clone(network: NeuralNetwork): NeuralNetwork {
+        return JSON.parse(JSON.stringify(network)) as NeuralNetwork;
+    }
+
+    static mutate(network: NeuralNetwork, rate: number, strength: number): void {
+        const nudge = (value: number) => Math.random() < rate
+            ? clamp(value + gaussian()*strength, -1, 1)
+            : value;
+
         network.levels.forEach(level => {
             for (let i = 0; i < level.biases.length; i++) {
-                level.biases[i] = lerp(level.biases[i], Math.random()*2-1, amount);
+                level.biases[i] = nudge(level.biases[i]);
             }
 
             for (let i = 0; i < level.weights.length; i++) {
                 for (let j = 0; j < level.weights[i].length; j++) {
-                    level.weights[i][j] = lerp(level.weights[i][j], Math.random()*2-1,amount);
+                    level.weights[i][j] = nudge(level.weights[i][j]);
                 }
             }
         });
+    }
+
+    static crossover(a: NeuralNetwork, b: NeuralNetwork): NeuralNetwork {
+        const child = NeuralNetwork.clone(a);
+        child.levels.forEach((level, l) => {
+            const other = b.levels[l];
+            for (let j = 0; j < level.biases.length; j++) {
+                if (Math.random() < 0.5) {
+                    level.biases[j] = other.biases[j];
+                    for (let i = 0; i < level.weights.length; i++) {
+                        level.weights[i][j] = other.weights[i][j];
+                    }
+                }
+            }
+        });
+        return child;
+    }
+    
+    static hasShape(network: NeuralNetwork, neuronCounts: number[]): boolean {
+        return network.levels?.length === neuronCounts.length - 1
+            && network.levels.every((level, i) =>
+                level.weights.length === neuronCounts[i] && level.biases.length === neuronCounts[i+1]);
     }
 }
 

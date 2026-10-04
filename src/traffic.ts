@@ -1,5 +1,6 @@
 import { Car } from "./car";
 import type { Road } from "./road";
+import type { Random } from "./utils";
 
 export const TRAFFIC_SPEED = 2;
 
@@ -13,6 +14,7 @@ const TWO_CAR_ROW_CHANCE = 0.7;
 
 export class TrafficGenerator {
     road: Road;
+    random: Random;
     cars: Car[] = [];
     // Number of traffic cars removed behind every living AI car (i.e. passed by all of them).
     removedCount = 0;
@@ -20,8 +22,9 @@ export class TrafficGenerator {
     #lastRow: Car[] = [];
     #lastFreeLanes: number[] = [];
 
-    constructor(road: Road) {
+    constructor(road: Road, random: Random = Math.random) {
         this.road = road;
+        this.random = random;
     }
 
     // Spawns rows ahead of `frontY` until `aheadDistance` is covered,
@@ -50,8 +53,8 @@ export class TrafficGenerator {
 
     #spawnRow(): void {
         const laneCount = this.road.laneCount;
-        const lanes = shuffle([...Array(laneCount).keys()]);
-        const blockedCount = laneCount > 1 && Math.random() < TWO_CAR_ROW_CHANCE
+        const lanes = shuffle([...Array(laneCount).keys()], this.random);
+        const blockedCount = laneCount > 1 && this.random() < TWO_CAR_ROW_CHANCE
             ? laneCount - 1
             : 1;
         const blocked = lanes.slice(0, blockedCount);
@@ -61,13 +64,15 @@ export class TrafficGenerator {
         if (this.#lastRow.length === 0) {
             y = -100;
         } else {
-            y = this.#lastRowY() - (MIN_ROW_GAP + Math.random()*(MAX_ROW_GAP - MIN_ROW_GAP))
+            y = this.#lastRowY() - (MIN_ROW_GAP + this.random()*(MAX_ROW_GAP - MIN_ROW_GAP))
                 - GAP_PER_LANE_SHIFT * minLaneShift(this.#lastFreeLanes, free);
         }
 
-        this.#lastRow = blocked.map(lane =>
-            new Car(this.road.getLaneCenter(lane), y, 30, 50, "DUMMY", TRAFFIC_SPEED)
-        );
+        this.#lastRow = blocked.map(lane => {
+            const car = new Car(this.road.getLaneCenter(lane), y, 30, 50, "DUMMY", TRAFFIC_SPEED);
+            car.speed = TRAFFIC_SPEED;
+            return car;
+        });
         this.#lastFreeLanes = free;
         this.cars.push(...this.#lastRow);
     }
@@ -83,9 +88,9 @@ function minLaneShift(from: number[], to: number[]): number {
     return best === Infinity ? 0 : best;
 }
 
-function shuffle<T>(array: T[]): T[] {
+function shuffle<T>(array: T[], random: Random): T[] {
     for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
     return array;
