@@ -1,4 +1,5 @@
 import { lerp, type Point, type Segment } from "./utils";
+import { getLampGlowSprite, LAMP_GLOW_RADIUS } from "./sprites";
 
 export interface Viewport {
     left: number;
@@ -134,14 +135,8 @@ export class Road {
 
             ctx.save();
             ctx.globalCompositeOperation = "lighter";
-            const pool = ctx.createRadialGradient(headX, y, 0, headX, y, 120);
-            pool.addColorStop(0, "rgba(255, 176, 90, 0.2)");
-            pool.addColorStop(0.5, "rgba(255, 150, 70, 0.07)");
-            pool.addColorStop(1, "rgba(255, 150, 70, 0)");
-            ctx.fillStyle = pool;
-            ctx.beginPath();
-            ctx.arc(headX, y, 120, 0, Math.PI*2);
-            ctx.fill();
+            ctx.drawImage(getLampGlowSprite(),
+                headX - LAMP_GLOW_RADIUS, y - LAMP_GLOW_RADIUS, LAMP_GLOW_RADIUS*2, LAMP_GLOW_RADIUS*2);
             ctx.restore();
 
             ctx.strokeStyle = "#2b2f44";

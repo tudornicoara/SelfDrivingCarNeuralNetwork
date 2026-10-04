@@ -24,7 +24,7 @@ function getElement(id: string): HTMLElement {
     return element;
 }
 
-function fitCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): { width: number; height: number } {
+function fitCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): { width: number; height: number; dpr: number } {
     const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
@@ -36,10 +36,11 @@ function fitCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): { 
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingQuality = "high";
-    return { width, height };
+    return { width, height, dpr };
 }
 
-const MAX_DPR = 2;
+const IS_MOBILE = window.matchMedia("(pointer: coarse)").matches;
+const MAX_DPR = IS_MOBILE ? 1.5 : 2;
 const VIEW_WIDTH = 260;
 const ROAD_WIDTH = 180;
 const CAMERA_ANCHOR = 0.7;
@@ -66,7 +67,6 @@ const hud = {
 const road = new Road(VIEW_WIDTH/2, ROAD_WIDTH);
 const effects = new Effects();
 
-const IS_MOBILE = window.matchMedia("(pointer: coarse)").matches;
 const N = IS_MOBILE ? 40 : 100;
 const ROUNDS = 3;
 const ELITE_COUNT = IS_MOBILE ? 3 : 5;
@@ -84,6 +84,15 @@ const STALL_FRAMES = 60 * 12;
 const LAG_DISTANCE = 400;
 // Hard cap on a round's length, in case the best car never crashes.
 const MAX_ROUND_FRAMES = 60 * 120;
+
+// The simulation runs at a fixed 60 steps per second of real time, times the chosen speed,
+// so training goes equally fast whatever the frame rate.
+const STEPS_PER_MS = 60 / 1000;
+const SPEEDS = [1, 2, 5, 10];
+// Most time per frame spent simulating, leaving room to draw
+const STEP_BUDGET_MS = 12;
+// How far ahead of the leading car traffic is spawned
+const TRAFFIC_AHEAD = 1200;
 
 // Bump the version whenever BRAIN_SHAPE changes, so old brains are dropped
 const STORAGE_PREFIX = "v2:";
@@ -108,12 +117,27 @@ let traffic: TrafficGenerator;
 let bestCar: Car;
 let frame = 0;
 let cameraY = 0;
+let renderCount = 0;
 
+let speedIndex = 0;
+let stepBacklog = 0;
+let lastTime = 0;
+
+let vignetteCache: { canvas: HTMLCanvasElement; key: string } | null = null;
+
+const speedButton = getElement("speedButton");
+speedButton.addEventListener("click", () => {
+    speedIndex = (speedIndex + 1) % SPEEDS.length;
+    speedButton.textContent = `⏩ Speed ${SPEEDS[speedIndex]}×`;
+});
 document.getElementById("skipButton")!.addEventListener("click", skipGeneration);
 document.getElementById("discardButton")!.addEventListener("click", discard);
 
 startGeneration();
-animate();
+requestAnimationFrame(time => {
+    lastTime = time;
+    requestAnimationFrame(animate);
+});
 
 function startGeneration(): void {
     totals = population.map(() => 0);
@@ -242,14 +266,30 @@ function updateFitness(car: Car): void {
     car.fitness = car.passed * PASS_REWARD + gainOnTraffic;
 }
 
-function animate(time = 0): void {
+function animate(time: number): void {
+    stepBacklog += Math.min(time - lastTime, 250) * STEPS_PER_MS * SPEEDS[speedIndex];
+    lastTime = time;
+    const deadline = performance.now() + STEP_BUDGET_MS;
+    while (stepBacklog >= 1) {
+        step();
+        stepBacklog--;
+        if (performance.now() > deadline) {
+            stepBacklog = 0;
+        }
+    }
+
+    drawScene(cars.filter(c => !c.damaged).length, time);
+    requestAnimationFrame(animate);
+}
+
+function step(): void {
     const alive = cars.filter(c => !c.damaged);
     const leader = alive.length > 0
         ? alive.reduce((a, b) => b.y < a.y ? b : a)
         : bestCar;
     const rearY = alive.length > 0 ? Math.max(...alive.map(c => c.y)) : leader.y;
 
-    traffic.update(leader.y, rearY, window.innerHeight, 300);
+    traffic.update(leader.y, rearY, TRAFFIC_AHEAD, 300);
 
     for (const car of alive) {
         // Only traffic within sensor range matters for sensors and collisions
@@ -271,18 +311,15 @@ function animate(time = 0): void {
     frame++;
     if (cars.every(c => c.damaged) || frame >= MAX_ROUND_FRAMES) {
         nextRound();
-        requestAnimationFrame(animate);
         return;
     }
 
     bestCar = leader;
     effects.update();
-    drawScene(alive.length, time);
-    requestAnimationFrame(animate);
 }
 
 function drawScene(aliveCount: number, time: number): void {
-    const { width, height } = fitCanvas(carCanvas, carCtx);
+    const { width, height, dpr } = fitCanvas(carCanvas, carCtx);
 
     cameraY = Math.abs(bestCar.y - cameraY) > 300
         ? bestCar.y
@@ -324,9 +361,9 @@ function drawScene(aliveCount: number, time: number): void {
     effects.draw(carCtx);
 
     carCtx.restore();
-    drawVignette(carCtx, width, height);
+    carCtx.drawImage(getVignette(width, height, dpr), 0, 0, width, height);
 
-    if (frame % 10 === 0) {
+    if (renderCount++ % 10 === 0) {
         hud.generation.textContent = String(generation);
         hud.round.textContent = `${Math.min(round + 1, ROUNDS)}/${ROUNDS}`;
         hud.alive.textContent = `${aliveCount}/${N}`;
@@ -343,6 +380,20 @@ function drawScene(aliveCount: number, time: number): void {
         return;
     }
     Visualizer.drawNetwork(networkCtx, bestCar.brain!, network.width, network.height, time);
+}
+
+function getVignette(width: number, height: number, dpr: number): HTMLCanvasElement {
+    const key = `${width}x${height}@${dpr}`;
+    if (vignetteCache?.key !== key) {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(width * dpr));
+        canvas.height = Math.max(1, Math.round(height * dpr));
+        const ctx = canvas.getContext("2d")!;
+        ctx.scale(dpr, dpr);
+        drawVignette(ctx, width, height);
+        vignetteCache = { canvas, key };
+    }
+    return vignetteCache.canvas;
 }
 
 function drawVignette(ctx: CanvasRenderingContext2D, width: number, height: number): void {

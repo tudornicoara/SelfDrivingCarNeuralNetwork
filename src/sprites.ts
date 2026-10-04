@@ -73,6 +73,24 @@ export function getBeamSprite(): HTMLCanvasElement {
     return beamSprite;
 }
 
+export const LAMP_GLOW_RADIUS = 120;
+let lampGlowSprite: HTMLCanvasElement | null = null;
+
+export function getLampGlowSprite(): HTMLCanvasElement {
+    if (!lampGlowSprite) {
+        const r = LAMP_GLOW_RADIUS;
+        lampGlowSprite = createSprite(r*2, r*2, ctx => {
+            const pool = ctx.createRadialGradient(r, r, 0, r, r, r);
+            pool.addColorStop(0, "rgba(255, 176, 90, 0.2)");
+            pool.addColorStop(0.5, "rgba(255, 150, 70, 0.07)");
+            pool.addColorStop(1, "rgba(255, 150, 70, 0)");
+            ctx.fillStyle = pool;
+            ctx.fillRect(0, 0, r*2, r*2);
+        });
+    }
+    return lampGlowSprite;
+}
+
 function createSprite(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): HTMLCanvasElement {
     const canvas = document.createElement("canvas");
     canvas.width = Math.ceil(width * SPRITE_SCALE);
